@@ -1,5 +1,4 @@
 -- Policy: Allow users to insert accounts for themselves
--- This is needed for the plaid-fetch-accounts function.
 CREATE POLICY "Enable insert for own accounts"
 ON public.accounts
 FOR INSERT
@@ -16,8 +15,8 @@ CREATE POLICY "Enable read access for shared household accounts"
 ON public.accounts
 FOR SELECT
 USING (
-  -- Check if the user's household_id matches the account's household_id
-  (SELECT household_id FROM public.profiles WHERE id = auth.uid()) = household_id
+  -- FIX: Changed 'public.profiles' to 'public.users'
+  (SELECT household_id FROM public.users WHERE id = auth.uid()) = household_id
   AND visibility = 'shared'
 );
 

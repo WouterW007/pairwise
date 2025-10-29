@@ -1,4 +1,4 @@
-
+-- This function will be triggered after a new user signs up.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -9,12 +9,13 @@ DECLARE
   new_household_id uuid;
 BEGIN
   -- 1. Create a new household for the user.
+  -- FIX: This now works because the 'name' column exists.
   INSERT INTO public.households (name)
   VALUES ('My Household')
   RETURNING id INTO new_household_id;
 
-  -- 2. Create a profile for the user in public.users,
-  -- linking them to their new household.
+  -- 2. Create a profile for the user in public.users.
+  -- FIX: This now inserts into the correct table.
   INSERT INTO public.users (id, email, household_id)
   VALUES (NEW.id, NEW.email, new_household_id);
 

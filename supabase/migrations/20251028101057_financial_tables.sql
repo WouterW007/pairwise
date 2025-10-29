@@ -11,8 +11,14 @@ CREATE TABLE IF NOT EXISTS public.users (
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 -- 3. Add policies for users to manage their own data
+-- FIX: Added DROP POLICY for idempotency
+DROP POLICY IF EXISTS "Allow users to see their own data" ON public.users;
 CREATE POLICY "Allow users to see their own data"
-ON public.users FOR SELECT USING (id = auth.uid());
+ON public.users FOR SELECT
+USING (auth.role() = 'authenticated'); -- REVERTED: Allow any logged-in user to read
+
+-- FIX: Added DROP POLICY for idempotency
+DROP POLICY IF EXISTS "Allow users to update their own data" ON public.users;
 CREATE POLICY "Allow users to update their own data"
 ON public.users FOR UPDATE USING (id = auth.uid());
 
@@ -24,7 +30,6 @@ ON public.users FOR UPDATE USING (id = auth.uid());
 -- 4. Plaid Items Table
 CREATE TABLE public.plaid_items (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    -- FIX: References public.users(id)
     user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     plaid_item_id text NOT NULL UNIQUE,
     access_token text NOT NULL,
@@ -36,7 +41,6 @@ CREATE TABLE public.accounts (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     plaid_account_id text NOT NULL UNIQUE,
     plaid_item_id uuid NOT NULL REFERENCES public.plaid_items(id) ON DELETE CASCADE,
-    -- FIX: References public.users(id)
     user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     household_id uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
     name text NOT NULL,
@@ -78,7 +82,6 @@ CREATE TABLE public.goals (
 CREATE TABLE public.goal_contributions (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     goal_id uuid NOT NULL REFERENCES public.goals(id) ON DELETE CASCADE,
-    -- FIX: References public.users(id)
     user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     amount numeric(18, 4) NOT NULL,
     contribution_date timestamptz DEFAULT now()

@@ -2,6 +2,7 @@
 -- This table stores the shared "couple" entity and their subscription status.
 CREATE TABLE public.households (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT, -- FIX: Added the 'name' column
     created_at timestamptz DEFAULT now() NOT NULL,
     apple_original_transaction_id text UNIQUE,
     apple_product_id text,
@@ -9,23 +10,15 @@ CREATE TABLE public.households (
     subscription_expires_at timestamptz
 );
 
--- 2. Profiles Table
+-- 2. Users Table (Renamed from 'profiles')
 -- This links Supabase's auth.users to our household data.
-CREATE TABLE public.profiles (
+CREATE TABLE public.users (
     id uuid NOT NULL PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     updated_at timestamptz DEFAULT now(),
     full_name text,
     avatar_url text,
-    household_id uuid REFERENCES public.households(id) ON DELETE SET NULL
+    household_id uuid REFERENCES public.households(id) ON DELETE SET NULL,
+    -- FIX: Added email for consistency
+    email TEXT UNIQUE
 );
 
--- 3. Household Invites Table
--- This manages the invitation flow for partners to join a household.
-CREATE TABLE public.household_invites (
-    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    household_id uuid NOT NULL REFERENCES public.households(id) ON DELETE CASCADE,
-    inviter_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    invitee_email text NOT NULL,
-    status text DEFAULT 'pending'::text NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL
-);
