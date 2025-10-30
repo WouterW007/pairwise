@@ -1,12 +1,25 @@
--- 1. Enable RLS for goals and contributions
+-- 1. Enable RLS (no change)
 ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goal_contributions ENABLE ROW LEVEL SECURITY;
 
--- 2. Policy for 'goals' table
--- Allow household members to see and manage goals for their household.
-CREATE POLICY "Enable ALL access for household members on goals"
-ON public.goals
-FOR ALL
+-- 2. Drop the old, incorrect 'FOR ALL' policy
+DROP POLICY IF EXISTS "Enable ALL access for household members on goals" ON public.goals;
+
+-- 3. Create specific, correct policies for 'goals'
+CREATE POLICY "Enable READ access for household members"
+ON public.goals FOR SELECT
+USING (
+  (SELECT household_id FROM public.users WHERE id = auth.uid()) = household_id
+);
+
+CREATE POLICY "Enable INSERT access for household members"
+ON public.goals FOR INSERT
+WITH CHECK (
+  (SELECT household_id FROM public.users WHERE id = auth.uid()) = household_id
+);
+
+CREATE POLICY "Enable UPDATE access for household members"
+ON public.goals FOR UPDATE
 USING (
   (SELECT household_id FROM public.users WHERE id = auth.uid()) = household_id
 )
@@ -14,16 +27,24 @@ WITH CHECK (
   (SELECT household_id FROM public.users WHERE id = auth.uid()) = household_id
 );
 
--- 3. Policy for 'goal_contributions' table
--- Allow users to insert contributions for their own household's goals.
-CREATE POLICY "Enable INSERT for household members on goal_contributions"
-ON public.goal_contributions
-FOR INSERT
-WITH CHECK (
-  -- User must be the one making the contribution
-  user_id = auth.uid()
-  AND
-  -- The goal must belong to the user's household
+CREATE POLICY "Enable DELETE access for household members"
+ON public.goals FOR DELETE
+USING (
+  (SELECT household_id FROM public.users WHERE id = auth.uid()) = household_id
+);
+
+
+-- 4. Drop old 'goal_contributions' policies (just in case)
+DROP POLICY IF EXISTS "Enable INSERT for household members on goal_contributions" ON public.goal_contributions;
+DROP POLICY IF EXISTS "Enable READ for household members on goal_contributions" ON public.goal_contributions;
+DROP POLICY IF EXISTS "Enable READ for household members on goal_contributions" ON public.goal_contributions;
+DROP POLICY IF EXISTS "Enable INSERT access for household members" ON public.goal_contributions;
+
+
+-- 5. Create specific, correct policies for 'goal_contributions'
+CREATE POLICY "Enable READ access for household members"
+ON public.goal_contributions FOR SELECT
+USING (
   EXISTS (
     SELECT 1
     FROM public.goals g
@@ -32,12 +53,11 @@ WITH CHECK (
   )
 );
 
--- Allow users to READ contributions for their own household's goals.
-CREATE POLICY "Enable READ for household members on goal_contributions"
-ON public.goal_contributions
-FOR SELECT
-USING (
-  -- The goal must belong to the user's household
+CREATE POLICY "Enable INSERT access for household members"
+ON public.goal_contributions FOR INSERT
+WITH CHECK (
+  user_id = auth.uid()
+  AND
   EXISTS (
     SELECT 1
     FROM public.goals g
