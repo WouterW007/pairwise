@@ -6,19 +6,22 @@ import 'package:pairwise/main.dart'; // To get the supabase client
 import 'package:pairwise/features/accounts/application/account_providers.dart';
 
 // Import our widgets
+import 'package:pairwise/features/accounts/presentation/account_list_tile.dart';
 import 'package:pairwise/features/plaid/presentation/plaid_link_handler.dart';
 import 'package:pairwise/features/transactions/presentation/transactions_list_view.dart';
-
-// 1. IMPORT our new household widgets
 import 'package:pairwise/features/household/presentation/invite_partner_widget.dart';
 import 'package:pairwise/features/household/presentation/pending_invites_widget.dart';
-import 'package:pairwise/features/accounts/presentation/account_list_tile.dart';
+
+// --- ADD GOALS IMPORTS ---
+import 'package:pairwise/features/goals/presentation/goals_list_view.dart';
+import 'package:pairwise/features/goals/presentation/create_goal_sheet.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the provider for the list of accounts
     final accountsAsyncValue = ref.watch(accountsStreamProvider);
 
     return Scaffold(
@@ -31,22 +34,37 @@ class HomePage extends ConsumerWidget {
           )
         ],
       ),
+      // --- ADD FLOATING ACTION BUTTON ---
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // This shows our new widget as a modal bottom sheet
+          showModalBottomSheet(
+            context: context,
+            builder: (ctx) => const CreateGoalSheet(),
+            isScrollControlled: true, // Allows sheet to resize for keyboard
+          );
+        },
+        child: const Icon(Icons.add),
+        tooltip: 'Create New Goal',
+      ),
+      // --- END FAB ---
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        // 2. Wrap in a SingleChildScrollView
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Display the user's ID
               Text('Welcome! User ID: ${supabase.auth.currentUser!.id}'),
               const SizedBox(height: 20),
 
-              // --- 3. HOUSEHOLD SECTION ---
+              // --- HOUSEHOLD SECTION ---
               const PendingInvitesWidget(),
               const InvitePartnerWidget(),
               // --- END HOUSEHOLD SECTION ---
 
               const SizedBox(height: 30),
+              // --- PLAID LINK BUTTON ---
               const Center(
                 child: PlaidLinkHandler(),
               ),
@@ -60,7 +78,7 @@ class HomePage extends ConsumerWidget {
               const Divider(),
               ConstrainedBox(
                 constraints: const BoxConstraints(
-                  maxHeight: 180, // You can adjust this height
+                  maxHeight: 180, // Fixed height for accounts list
                 ),
                 child: accountsAsyncValue.when(
                   data: (accounts) {
@@ -77,18 +95,32 @@ class HomePage extends ConsumerWidget {
                         return AccountListTile(account: account);
                       },
                     );
-                  }, // <-- **FIX:** CLOSE data block
-                  loading: () => const Center(
-                      child:
-                          CircularProgressIndicator()), // <-- **FIX:** ADD loading handler
-                  error: (error, stack) => Center(
-                      child: Text(
-                          'Error loading accounts: $error')), // <-- **FIX:** ADD error handler
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, stack) =>
+                      Center(child: Text('Error loading accounts: $error')),
                 ),
-              ), // <-- **FIX:** CLOSE ConstrainedBox
+              ),
+              // --- END ACCOUNTS SECTION ---
 
-              // --- FIX: MOVED TRANSACTIONS SECTION OUTSIDE ---
-              const SizedBox(height: 20), // Add spacing
+              const SizedBox(height: 20),
+
+              // --- GOALS SECTION ---
+              const Text(
+                'Shared Goals:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const Divider(),
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: 200, // Fixed height for goals
+                ),
+                child: const GoalsListView(),
+              ),
+              // --- END GOALS SECTION ---
+
+              const SizedBox(height: 20),
 
               // --- TRANSACTIONS SECTION ---
               const Text(
@@ -96,14 +128,13 @@ class HomePage extends ConsumerWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const Divider(),
-
-              // Give transactions a fixed height
               ConstrainedBox(
                 constraints: const BoxConstraints(
                   maxHeight: 400, // Fixed height for transactions
                 ),
                 child: const TransactionsListView(),
               ),
+              // --- END TRANSACTIONS SECTION ---
             ],
           ),
         ),
