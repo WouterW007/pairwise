@@ -3,7 +3,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 import { encode } from 'https://deno.land/std@0.208.0/encoding/base64.ts'
 
-// --- Crypto Helper Functions (Keep as-is) ---
+// --- Crypto Helper Functions ---
+
+// Imports the raw key string into a format SubtleCrypto can use
 async function importKey(keyString: string) {
   const keyData = atob(keyString)
   const keyBuffer = new Uint8Array(keyData.length)
@@ -19,16 +21,21 @@ async function importKey(keyString: string) {
   )
 }
 
+// Encrypts plaintext with the imported key
 async function encrypt(plaintext: string, key: CryptoKey) {
-  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const iv = crypto.getRandomValues(new Uint8Array(12)) // 96-bit IV
   const encodedText = new TextEncoder().encode(plaintext)
+
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv },
     key,
     encodedText
   )
+
+  // We store the IV and the ciphertext together as one string
   const ivString = encode(iv)
   const cipherString = encode(new Uint8Array(ciphertext))
+
   return `${ivString}:${cipherString}`
 }
 
@@ -92,7 +99,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('--- plaid-exchange-public-token (v_COMBINED) invoked ---')
+    console.log('--- plaid-exchange-public-token (v_COMBINED_UNIQUE) invoked ---') // Version updated
     const { public_token } = await req.json()
     if (!public_token) throw new Error('Missing public_token')
 
@@ -117,10 +124,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     )
-    const { data: { user }, error: userError } = await supabaseUserClient.auth.getUser()
+    const { data: { user }, error: userError } =
+      await supabaseUserClient.auth.getUser()
     if (userError) throw userError
     const userId = user!.id
-    console.log(`Step 1/4: Authenticated user: ${userId}`)
+    console.log(`Step 1/5: Authenticated user: ${userId}`)
 
     // 4. Exchange Plaid token
     const plaidRequest = {
@@ -138,23 +146,24 @@ serve(async (req) => {
     )
     if (!plaidRes.ok) throw new Error(await plaidRes.text())
     const { access_token, item_id } = await plaidRes.json()
-    console.log(`Step 2/4: Plaid token exchanged for item_id: ${item_id}`)
+    console.log(`Step 2/5: Plaid token exchanged for item_id: ${item_id}`)
 
     // 5. Encrypt and Store Plaid Item
     const encryptedAccessToken = await encrypt(access_token, cryptoKey)
-    const { data: newPlaidItem, error: insertItemError } = await supabaseUserClient
-      .from('plaid_items')
-      .insert({
-        user_id: userId,
-        plaid_item_id: item_id,
-        access_token: encryptedAccessToken,
-      })
-      .select('id')
-      .single()
+    const { data: newPlaidItem, error: insertItemError } =
+      await supabaseUserClient
+        .from('plaid_items')
+        .insert({
+          user_id: userId,
+          plaid_item_id: item_id,
+          access_token: encryptedAccessToken,
+        })
+        .select('id')
+        .single()
 
     if (insertItemError) throw insertItemError
     const dbItemUuid = newPlaidItem.id
-    console.log(`Step 3/4: Plaid item saved to DB with UUID: ${dbItemUuid}`)
+    console.log(`Step 3/5: Plaid item saved to DB with UUID: ${dbItemUuid}`)
 
     // 6. Get User's Household ID
     const { data: userProfile, error: profileError } = await supabaseUserClient
@@ -166,8 +175,11 @@ serve(async (req) => {
     const householdId = userProfile.household_id
 
     // --- START INLINED LOGIC FROM plaid-fetch-accounts ---
+
+    // --- THIS IS THE FIX ---
+    // We make the plaid_account_id unique by appending the db_item_uuid
     const accountsToInsert = mockAccounts.map((account) => ({
-      plaid_account_id: account.account_id,
+      plaid_account_id: `${account.account_id}_${dbItemUuid}`, // <-- THIS MAKES IT UNIQUE
       plaid_item_id: dbItemUuid,
       user_id: userId,
       household_id: householdId,
@@ -178,31 +190,44 @@ serve(async (req) => {
       current_balance: account.balances.current,
       visibility: 'private',
     }))
+    // --- END FIX ---
 
     // Insert accounts using ADMIN client to bypass RLS check
-    const { data: insertedAccounts, error: insertAcctError } = await supabaseAdmin
-      .from('accounts')
-      .insert(accountsToInsert)
-      .select('id, plaid_account_id') // Return the new IDs
+    const { data: insertedAccounts, error: insertAcctError } =
+      await supabaseAdmin
+        .from('accounts')
+        .insert(accountsToInsert)
+        .select('id, plaid_account_id') // Return the new IDs
 
-    if (insertAcctError) throw insertAcctError
-    console.log(`Step 4/4: Inserted ${insertedAccounts.length} accounts.`)
+    if (insertAcctError) {
+      console.error('Error inserting accounts:', insertAcctError.message) // Better logging
+      throw insertAcctError
+    }
+    console.log(`Step 4/5: Inserted ${insertedAccounts.length} accounts.`)
     // --- END INLINED LOGIC ---
 
     // --- START INLINED LOGIC FROM plaid-sync-transactions ---
+    // This logic is now correct because `insertedAccounts` has the new unique IDs
     const accountIdMap = new Map(
-      insertedAccounts.map((a) => [a.plaid_account_id, a.id])
+      insertedAccounts.map((a: any) => [a.plaid_account_id, a.id])
     )
 
     const transactionsToInsert = mockTransactions
       .map((tx) => {
-        const internalAccountId = accountIdMap.get(tx.account_id)
+        // --- THIS IS THE SECOND PART OF THE FIX ---
+        // We look up the *new unique ID* for the transaction
+        const uniqueMockAccountId = `${tx.account_id}_${dbItemUuid}`
+        const internalAccountId = accountIdMap.get(uniqueMockAccountId) // <-- Use the unique ID
+        // --- END FIX ---
+
         if (!internalAccountId) {
-          console.warn(`Skipping tx: ${tx.name}, no matching account found.`)
+          console.warn(
+            `Skipping tx: ${tx.name}, no matching account found for ${uniqueMockAccountId}.`
+          )
           return null
         }
         return {
-          plaid_transaction_id: tx.transaction_id,
+          plaid_transaction_id: `${tx.transaction_id}_${dbItemUuid}`, // <-- Also make tx ID unique
           account_id: internalAccountId,
           household_id: householdId,
           name: tx.name,
@@ -222,8 +247,13 @@ serve(async (req) => {
         .from('transactions')
         .insert(transactionsToInsert)
 
-      if (insertTxError) throw insertTxError
-      console.log(`Step 5/5: Inserted ${transactionsToInsert.length} transactions.`)
+      if (insertTxError) {
+        console.error('Error inserting transactions:', insertTxError.message) // Better logging
+        throw insertTxError
+      }
+      console.log(
+        `Step 5/5: Inserted ${transactionsToInsert.length} transactions.`
+      )
     } else {
       console.log(`Step 5/5: No transactions to insert.`)
     }

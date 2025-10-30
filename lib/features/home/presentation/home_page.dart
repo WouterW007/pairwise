@@ -12,6 +12,7 @@ import 'package:pairwise/features/transactions/presentation/transactions_list_vi
 // 1. IMPORT our new household widgets
 import 'package:pairwise/features/household/presentation/invite_partner_widget.dart';
 import 'package:pairwise/features/household/presentation/pending_invites_widget.dart';
+import 'package:pairwise/features/accounts/presentation/account_list_tile.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -32,8 +33,7 @@ class HomePage extends ConsumerWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        // 2. CHANGE: Wrap in a SingleChildScrollView
-        // This lets the user scroll if the content is too long
+        // 2. Wrap in a SingleChildScrollView
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -41,7 +41,7 @@ class HomePage extends ConsumerWidget {
               Text('Welcome! User ID: ${supabase.auth.currentUser!.id}'),
               const SizedBox(height: 20),
 
-              // --- 3. ADD: HOUSEHOLD SECTION ---
+              // --- 3. HOUSEHOLD SECTION ---
               const PendingInvitesWidget(),
               const InvitePartnerWidget(),
               // --- END HOUSEHOLD SECTION ---
@@ -60,7 +60,7 @@ class HomePage extends ConsumerWidget {
               const Divider(),
               ConstrainedBox(
                 constraints: const BoxConstraints(
-                  maxHeight: 180,
+                  maxHeight: 180, // You can adjust this height
                 ),
                 child: accountsAsyncValue.when(
                   data: (accounts) {
@@ -68,32 +68,27 @@ class HomePage extends ConsumerWidget {
                       return const Center(
                           child: Text('No accounts linked yet.'));
                     }
+                    // Use our new AccountListTile widget
                     return ListView.builder(
                       shrinkWrap: true,
                       itemCount: accounts.length,
                       itemBuilder: (context, index) {
                         final account = accounts[index];
-                        return ListTile(
-                          title: Text(account.name),
-                          subtitle: Text(
-                              '**** ${account.mask} (${account.visibility})'),
-                          trailing: Text(
-                            account.currentBalance != null
-                                ? '\$${account.currentBalance!.toStringAsFixed(2)}'
-                                : 'N/A',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        );
+                        return AccountListTile(account: account);
                       },
                     );
-                  },
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (error, stack) =>
-                      Center(child: Text('Error loading accounts: $error')),
+                  }, // <-- **FIX:** CLOSE data block
+                  loading: () => const Center(
+                      child:
+                          CircularProgressIndicator()), // <-- **FIX:** ADD loading handler
+                  error: (error, stack) => Center(
+                      child: Text(
+                          'Error loading accounts: $error')), // <-- **FIX:** ADD error handler
                 ),
-              ),
-              const SizedBox(height: 20),
+              ), // <-- **FIX:** CLOSE ConstrainedBox
+
+              // --- FIX: MOVED TRANSACTIONS SECTION OUTSIDE ---
+              const SizedBox(height: 20), // Add spacing
 
               // --- TRANSACTIONS SECTION ---
               const Text(
@@ -102,9 +97,7 @@ class HomePage extends ConsumerWidget {
               ),
               const Divider(),
 
-              // 4. CHANGE: Give transactions a fixed height
-              // We can't have two scrolling ListViews. We'll make
-              // the transactions list a fixed height for now.
+              // Give transactions a fixed height
               ConstrainedBox(
                 constraints: const BoxConstraints(
                   maxHeight: 400, // Fixed height for transactions
