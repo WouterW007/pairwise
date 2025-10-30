@@ -40,4 +40,25 @@ class GoalRepository {
       rethrow;
     }
   }
+
+  /// Adds a new contribution to a specific goal by calling our RPC
+  Future<void> addContribution({
+    required String goalId,
+    required double amount,
+  }) async {
+    try {
+      // 1. Prepare the parameters for our 'add_goal_contribution' RPC
+      final params = {
+        'goal_id_to_add_to': goalId,
+        'contribution_amount': amount,
+      };
+
+      // 2. Call the database function
+      // This will transactionally add the contribution AND update the goal's total
+      await supabase.rpc('add_goal_contribution', params: params);
+    } catch (e) {
+      print('Error adding contribution: $e');
+      rethrow;
+    }
+  }
 }

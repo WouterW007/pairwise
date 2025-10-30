@@ -1,11 +1,22 @@
-// lib/features/goals/presentation/goals_list_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pairwise/features/goals/application/goal_providers.dart';
-import 'package:percent_indicator/percent_indicator.dart'; // We'll need this soon
+import 'package:percent_indicator/percent_indicator.dart';
+import 'package:pairwise/features/goals/data/goal.dart';
+import 'package:pairwise/features/goals/presentation/add_contribution_sheet.dart';
 
 class GoalsListView extends ConsumerWidget {
   const GoalsListView({super.key});
+
+  // --- ADD HELPER METHOD ---
+  void _showAddContributionSheet(BuildContext context, Goal goal) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => AddContributionSheet(goal: goal),
+      isScrollControlled: true, // Allows sheet to resize for keyboard
+    );
+  }
+  // --- END HELPER METHOD ---
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -15,7 +26,11 @@ class GoalsListView extends ConsumerWidget {
       data: (goals) {
         if (goals.isEmpty) {
           return const Center(
-            child: Text('No shared goals yet. Create one!'),
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                  'No shared goals yet. Tap the "+" button to create one!'),
+            ),
           );
         }
 
@@ -23,10 +38,17 @@ class GoalsListView extends ConsumerWidget {
           itemCount: goals.length,
           itemBuilder: (context, index) {
             final goal = goals[index];
-            final percent =
-                (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0);
 
-            // We'll use a simple ListTile for now
+            // --- FIX: Ensure target amount is not zero to avoid NaN ---
+            final double percent;
+            if (goal.targetAmount == 0) {
+              percent = 0.0;
+            } else {
+              percent =
+                  (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0);
+            }
+            // --- END FIX ---
+
             return Card(
               child: ListTile(
                 title: Text(goal.name,
@@ -49,12 +71,12 @@ class GoalsListView extends ConsumerWidget {
                     ),
                   ],
                 ),
+                // --- UPDATE THE 'Add' BUTTON ---
                 trailing: TextButton(
-                  onPressed: () {
-                    // TODO: Implement "Add Contribution"
-                  },
+                  onPressed: () => _showAddContributionSheet(context, goal),
                   child: const Text('Add'),
                 ),
+                // --- END UPDATE ---
               ),
             );
           },
