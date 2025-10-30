@@ -32,62 +32,30 @@ class PlaidRepository {
     }
   }
 
-  /// Chains Plaid token exchange, account fetching, and transaction sync.
+  // --- THIS IS THE FIX ---
+  // This function is now much simpler. It only calls one Edge Function.
   Future<void> linkAccountAndSync({
     required String publicToken,
   }) async {
     try {
-      // Step 1: Call 'plaid-exchange-public-token'
+      // Step 1: Call 'plaid-exchange-public-token' and let it
+      // handle the entire sync process.
+      print('Step 1/1: Exchanging token and syncing all data...');
       final exchangeResult = await _client.functions.invoke(
-        'plaid-exchange-public-token',
+        'plaid-exchange-public-token', // This function now does everything
         body: {'public_token': publicToken},
       );
 
       if (exchangeResult.status != 200) {
         throw Exception(
-            'Failed to exchange public token: ${exchangeResult.data['error']}');
+            'Failed to link and sync: ${exchangeResult.data['error']}');
       }
 
-      final String plaidItemId = exchangeResult.data['plaid_item_id'];
-      final String dbItemUuid = exchangeResult.data['db_item_uuid'];
-
-      if (plaidItemId.isEmpty || dbItemUuid.isEmpty) {
-        throw Exception('Failed to get item IDs from token exchange.');
-      }
-      print('Step 1/3: Public token exchanged successfully.');
-
-      // Step 2: Call 'plaid-fetch-accounts'
-      final fetchResult = await _client.functions.invoke(
-        'plaid-fetch-accounts',
-        body: {
-          'plaid_item_id': plaidItemId,
-          'db_item_uuid': dbItemUuid,
-        },
-      );
-
-      if (fetchResult.status != 200) {
-        throw Exception(
-            'Failed to fetch accounts: ${fetchResult.data['error']}');
-      }
-      print('Step 2/3: Accounts fetched successfully.');
-
-      // Step 3: Call 'plaid-sync-transactions' (The NEW step)
-      final syncResult = await _client.functions.invoke(
-        'plaid-sync-transactions',
-        body: {
-          'plaid_item_id': plaidItemId,
-          'db_item_uuid': dbItemUuid, // <-- THIS IS THE FIX
-        },
-      );
-
-      if (syncResult.status != 200) {
-        throw Exception(
-            'Failed to sync transactions: ${syncResult.data['error']}');
-      }
-      print('Step 3/3: Initial transactions synced successfully.');
+      print('Full initial sync complete!');
     } catch (e) {
       print('Error in linkAccountAndSync: $e');
       rethrow;
     }
   }
+// --- END FIX ---
 }

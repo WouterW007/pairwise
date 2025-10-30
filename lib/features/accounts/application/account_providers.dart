@@ -37,11 +37,14 @@ final householdIdProvider = FutureProvider<String?>((ref) async {
   final user = supabase.auth.currentUser;
   if (user == null) return null;
 
+  // --- THIS IS THE FIX ---
+  // The table is 'users', not 'profiles'
   final profile = await supabase
-      .from('profiles')
+      .from('users') // <-- WAS 'profiles'
       .select('household_id')
       .eq('id', user.id)
       .single();
+  // --- END FIX ---
 
   return profile['household_id'] as String?;
 });

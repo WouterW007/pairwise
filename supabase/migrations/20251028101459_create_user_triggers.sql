@@ -9,15 +9,16 @@ DECLARE
   new_household_id uuid;
 BEGIN
   -- 1. Create a new household for the user.
-  -- FIX: This now works because the 'name' column exists.
   INSERT INTO public.households (name)
   VALUES ('My Household')
   RETURNING id INTO new_household_id;
 
   -- 2. Create a profile for the user in public.users.
-  -- FIX: This now inserts into the correct table.
+  -- === THIS IS THE FIX ===
+  -- We now also insert the user's email
   INSERT INTO public.users (id, email, household_id)
   VALUES (NEW.id, NEW.email, new_household_id);
+  -- === END FIX ===
 
   RETURN NEW;
 END;

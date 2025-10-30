@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pairwise/features/household/application/household_providers.dart';
 import 'package:pairwise/features/household/data/household_repository.dart';
+// --- FIX: IMPORT THE ACCOUNTS PROVIDER ---
+import 'package:pairwise/features/accounts/application/account_providers.dart';
 
 // We'll use this to manage the loading state of the "Accept" button
 final _acceptLoadingProvider = StateProvider<bool>((ref) => false);
@@ -20,6 +22,13 @@ class PendingInvitesWidget extends ConsumerWidget {
       // Call the repository to accept the invite
       await ref.read(householdRepositoryProvider).acceptInvite(inviteId);
 
+      // --- THIS IS THE FIX ---
+      // By invalidating these providers, we force them to re-run
+      // with the new household_id.
+      ref.invalidate(householdIdProvider);
+      ref.invalidate(pendingInvitesProvider);
+      // --- END FIX ---
+
       // Show success
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -27,9 +36,6 @@ class PendingInvitesWidget extends ConsumerWidget {
           backgroundColor: Colors.green,
         ),
       );
-
-      // Refresh the list of pending invites
-      ref.invalidate(pendingInvitesProvider);
     } catch (e) {
       // Show error
       ScaffoldMessenger.of(context).showSnackBar(

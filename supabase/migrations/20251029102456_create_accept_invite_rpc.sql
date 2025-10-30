@@ -5,7 +5,8 @@ CREATE OR REPLACE FUNCTION public.accept_invite(
 )
 RETURNS void
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER -- <-- THIS IS THE FIX
+SET search_path = public -- Required for SECURITY DEFINER
 AS $$
 DECLARE
   household_to_join UUID;
