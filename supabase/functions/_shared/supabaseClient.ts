@@ -58,10 +58,10 @@ export async function getHouseholdId(
 
   // Query the profiles table for the household ID
   const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('household_id')
-    .eq('id', userId)
-    .single();
+          .from('users') // <-- MAKE SURE THIS SAYS 'users'
+          .select('household_id')
+          .eq('id', userId)
+          .single();
 
   if (error) {
     console.error('Error fetching profile:', error.message);
