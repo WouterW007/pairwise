@@ -54,7 +54,8 @@ Android Studio will place build artifacts here
 
 
 Supabase
-
+.supabase/
 supabase/.temp/
 supabase/README.md
 
+*.env *.env.local
