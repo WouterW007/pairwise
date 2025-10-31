@@ -8,15 +8,13 @@ import 'package:pairwise/features/goals/presentation/add_contribution_sheet.dart
 class GoalsListView extends ConsumerWidget {
   const GoalsListView({super.key});
 
-  // --- ADD HELPER METHOD ---
   void _showAddContributionSheet(BuildContext context, Goal goal) {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => AddContributionSheet(goal: goal),
-      isScrollControlled: true, // Allows sheet to resize for keyboard
+      isScrollControlled: true,
     );
   }
-  // --- END HELPER METHOD ---
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,11 +33,14 @@ class GoalsListView extends ConsumerWidget {
         }
 
         return ListView.builder(
+          // --- FIXES ARE HERE ---
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          // --- END FIXES ---
           itemCount: goals.length,
           itemBuilder: (context, index) {
             final goal = goals[index];
 
-            // --- FIX: Ensure target amount is not zero to avoid NaN ---
             final double percent;
             if (goal.targetAmount == 0) {
               percent = 0.0;
@@ -47,7 +48,6 @@ class GoalsListView extends ConsumerWidget {
               percent =
                   (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0);
             }
-            // --- END FIX ---
 
             return Card(
               child: ListTile(
@@ -60,7 +60,8 @@ class GoalsListView extends ConsumerWidget {
                     LinearPercentIndicator(
                       percent: percent,
                       lineHeight: 8.0,
-                      backgroundColor: Colors.grey[700],
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceVariant,
                       progressColor: Colors.green,
                       barRadius: const Radius.circular(4),
                     ),
@@ -71,12 +72,10 @@ class GoalsListView extends ConsumerWidget {
                     ),
                   ],
                 ),
-                // --- UPDATE THE 'Add' BUTTON ---
                 trailing: TextButton(
                   onPressed: () => _showAddContributionSheet(context, goal),
                   child: const Text('Add'),
                 ),
-                // --- END UPDATE ---
               ),
             );
           },

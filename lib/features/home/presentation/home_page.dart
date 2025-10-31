@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pairwise/features/accounts/application/account_providers.dart';
+import 'package:pairwise/features/accounts/presentation/account_list_tile.dart';
 import 'package:pairwise/features/check_ins/application/check_in_providers.dart';
 import 'package:pairwise/features/check_ins/data/check_in_repository.dart';
 import 'package:pairwise/features/check_ins/data/check_in_session.dart';
 import 'package:pairwise/features/check_ins/presentation/check_in_page.dart';
+import 'package:pairwise/features/goals/application/goal_providers.dart';
 import 'package:pairwise/features/goals/presentation/create_goal_sheet.dart';
 import 'package:pairwise/features/goals/presentation/goals_list_view.dart';
-import 'package:pairwise/features/goals/application/goal_providers.dart';
 import 'package:pairwise/features/household/application/household_providers.dart';
 import 'package:pairwise/features/household/presentation/invite_partner_widget.dart';
 import 'package:pairwise/features/household/presentation/pending_invites_widget.dart';
@@ -46,7 +47,6 @@ class HomePage extends ConsumerWidget {
     // Determines if the user is in a household yet.
     final householdIdAsync = ref.watch(householdIdProvider);
 
-    // --- FIX: Removed PlaidLinkHandler wrapper ---
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pairwise'),
@@ -54,14 +54,15 @@ class HomePage extends ConsumerWidget {
           // Sign-out button
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () =>
-                supabase.auth.signOut(), // <-- FIX: 'supabase' is now defined
+            onPressed: () => supabase.auth.signOut(),
           ),
         ],
       ),
       body: householdIdAsync.when(
         data: (householdId) {
-          // If user has no household, show partner invite UI
+          // --- FIX: This block is now only for users who TRULY have no household.
+          // In our setup, this will likely just be a loading/transitional state.
+          // The main logic is moved to _DashboardView.
           if (householdId == null) {
             return const SingleChildScrollView(
               padding: EdgeInsets.all(16.0),
@@ -94,14 +95,23 @@ class _DashboardView extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        // --- FIX: Invalidate correct providers ---
+        // Invalidate all our data providers to refresh
         ref.invalidate(accountsStreamProvider);
         ref.invalidate(transactionsStreamProvider);
         ref.invalidate(goalsStreamProvider);
+        ref.invalidate(checkInSessionsStreamProvider);
       },
       child: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
+          // --- FIX: MOVED INVITE WIDGETS HERE ---
+          // This will show pending invites if this user *is* an invitee
+          const PendingInvitesWidget(),
+          // This will allow this user to *send* an invite
+          const InvitePartnerWidget(),
+          const SizedBox(height: 16),
+          // --- END FIX ---
+
           // 1. Money Dates (Financial Check-ins) Card
           Card(
             child: Padding(
@@ -171,7 +181,26 @@ class _DashboardView extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // 2. Goals Card
+          // --- "YOUR ACCOUNTS" CARD ---
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Your Accounts',
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  const _AccountListView(),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 3. Goals Card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -188,7 +217,7 @@ class _DashboardView extends ConsumerWidget {
                       IconButton(
                         icon: const Icon(Icons.add),
                         onPressed: () {
-                          // --- FIX: Use standard showModalBottomSheet ---
+                          // Use standard showModalBottomSheet
                           showModalBottomSheet(
                             context: context,
                             builder: (ctx) => const CreateGoalSheet(),
@@ -207,7 +236,7 @@ class _DashboardView extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // 3. Transactions Card
+          // 4. Transactions Card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -226,7 +255,7 @@ class _DashboardView extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // --- FIX: Added Card for PlaidLinkHandler ---
+          // 5. Manage Accounts Card (with PlaidLinkHandler)
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -299,6 +328,43 @@ class _PastCheckInsList extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) => Center(child: Text('Error: ${e.toString()}')),
+    );
+  }
+}
+
+// --- _AccountListView WIDGET ---
+class _AccountListView extends ConsumerWidget {
+  const _AccountListView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accountsAsyncValue = ref.watch(accountsStreamProvider);
+
+    return accountsAsyncValue.when(
+      data: (accounts) {
+        if (accounts.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Text('No accounts linked yet.'),
+            ),
+          );
+        }
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: accounts.length,
+          itemBuilder: (context, index) {
+            final account = accounts[index];
+            // Use the AccountListTile you've already built
+            return AccountListTile(account: account);
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Text('Error loading accounts: $error'),
+      ),
     );
   }
 }
