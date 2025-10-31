@@ -1,4 +1,5 @@
-import { serve } from 'https-deno.land/std@0.168.0/http/server.ts';
+
+import { serve } from 'std/http/server.ts';
 import {
   createSupabaseClient,
   getHouseholdId,
@@ -113,3 +114,4 @@ serve(async (req) => {
     });
   }
 });
+

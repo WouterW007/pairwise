@@ -13,6 +13,7 @@ import 'package:pairwise/features/goals/presentation/goals_list_view.dart';
 import 'package:pairwise/features/household/application/household_providers.dart';
 import 'package:pairwise/features/household/presentation/invite_partner_widget.dart';
 import 'package:pairwise/features/household/presentation/pending_invites_widget.dart';
+import 'package:pairwise/features/insights/presentation/financial_insight_card.dart';
 import 'package:pairwise/features/plaid/application/plaid_linking_notifier.dart';
 import 'package:pairwise/features/plaid/presentation/plaid_link_handler.dart';
 import 'package:pairwise/features/transactions/application/transaction_providers.dart';
@@ -60,9 +61,7 @@ class HomePage extends ConsumerWidget {
       ),
       body: householdIdAsync.when(
         data: (householdId) {
-          // --- FIX: This block is now only for users who TRULY have no household.
-          // In our setup, this will likely just be a loading/transitional state.
-          // The main logic is moved to _DashboardView.
+          // If user has no household, show partner invite UI
           if (householdId == null) {
             return const SingleChildScrollView(
               padding: EdgeInsets.all(16.0),
@@ -100,17 +99,21 @@ class _DashboardView extends ConsumerWidget {
         ref.invalidate(transactionsStreamProvider);
         ref.invalidate(goalsStreamProvider);
         ref.invalidate(checkInSessionsStreamProvider);
+        // --- ADDED INSIGHT PROVIDER TO REFRESH ---
+        ref.invalidate(insightStateProvider);
       },
       child: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // --- FIX: MOVED INVITE WIDGETS HERE ---
-          // This will show pending invites if this user *is* an invitee
+          // --- ADDED AI INSIGHT CARD ---
+          const FinancialInsightCard(),
+          const SizedBox(height: 16),
+          // --- END ---
+
+          // Invite Partner Widgets
           const PendingInvitesWidget(),
-          // This will allow this user to *send* an invite
           const InvitePartnerWidget(),
           const SizedBox(height: 16),
-          // --- END FIX ---
 
           // 1. Money Dates (Financial Check-ins) Card
           Card(
@@ -181,7 +184,7 @@ class _DashboardView extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // --- "YOUR ACCOUNTS" CARD ---
+          // "YOUR ACCOUNTS" CARD
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -332,7 +335,7 @@ class _PastCheckInsList extends ConsumerWidget {
   }
 }
 
-// --- _AccountListView WIDGET ---
+// _AccountListView WIDGET
 class _AccountListView extends ConsumerWidget {
   const _AccountListView();
 
